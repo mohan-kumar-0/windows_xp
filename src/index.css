@@ -342,6 +342,8 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  /* Important for flex children scrolling */
 }
 
 /* Browser - FIXED */
@@ -350,6 +352,7 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-height: 0;
 }
 
 .browser-toolbar {
@@ -377,15 +380,15 @@ body {
   flex: 1;
   position: relative;
   width: 100%;
+  background: #fff;
+  min-height: 0;
 }
 
 .browser-content iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
+  border: none;
   width: 100%;
   height: 100%;
-  border: none;
+  display: block;
 }
 
 /* File Explorer - FIXED */
@@ -534,6 +537,55 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Clippy - FIXED PLACEMENT */
+.clippy-container {
+  position: absolute;
+  bottom: 50px;
+  right: 220px;
+  /* Stay clear of widgets */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.clippy-container * {
+  pointer-events: auto;
+}
+
+.clippy-bubble {
+  background: #ffffcc;
+  border: 1px solid black;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: black;
+  max-width: 180px;
+  margin-bottom: 5px;
+  position: relative;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.clippy-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -11px;
+  right: 20px;
+  border-width: 11px 11px 0 0;
+  border-style: solid;
+  border-color: #ffffcc transparent transparent;
+}
+
+.clippy-avatar {
+  background: #fbbf24;
+  padding: 10px;
+  border-radius: 50%;
+  border: 2px solid #b45309;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
 }
 
 .tm-gauge-label {

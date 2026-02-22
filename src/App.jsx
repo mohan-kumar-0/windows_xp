@@ -4,10 +4,8 @@ import {
   Cpu, HardDrive, Wifi, ShieldCheck, Database, Globe,
   FileText, Folder, Trash, X, Minus, Square, Search,
   ArrowLeft, ArrowRight, RefreshCw, Home, Power,
-  Monitor, Settings, User, Clock, Sun, Cloud, Wind,
-  ChevronRight, ChevronDown, Music, Image as ImageIcon,
-  StickyNote, Play, Volume2, Gamepad2, Mail, Calculator as CalcIcon,
-  Palette, AlertCircle, Info, ExternalLink
+  Monitor, Settings, User, Clock, Sun, Info, ExternalLink,
+  Music, Image as ImageIcon, Mail, Calculator as CalcIcon, Palette, AlertCircle
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -78,7 +76,7 @@ const App = () => {
       setWindows(prev => prev.map(w => w.id === appId ? { ...w, minimized: false, zIndex: Math.max(0, ...prev.map(win => win.zIndex)) + 1 } : w));
       return;
     }
-    const newWindow = { id: appId, title, zIndex: windows.length + 10, minimized: false, position: { x: 100 + windows.length * 40, y: 80 + windows.length * 40 } };
+    const newWindow = { id: appId, title, zIndex: windows.length + 10, minimized: false, position: { x: 100 + windows.length * 30, y: 80 + windows.length * 30 } };
     setWindows([...windows, newWindow]);
     setActiveWindow(appId);
   };
@@ -156,25 +154,36 @@ const App = () => {
         </AnimatePresence>
 
         <div className="widgets-tray">
-          <Widget title="Weather"><div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><Sun size={32} color="#fbbf24" /><div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>28°C</div><div style={{ fontSize: '10px', opacity: 0.8 }}>Sunny</div></div></div></Widget>
-          <Widget title="CPU Pulse"><div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '40px' }}><div style={{ width: '40px', background: stats.cpu.load > 80 ? '#ef4444' : '#10b981', height: `${stats.cpu.load}%`, transition: 'height 0.3s' }}></div><div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.cpu.load}%</div></div></Widget>
+          <div className="xp-widget">
+            <div className="widget-title">Weather</div>
+            <div className="widget-body"><div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><Sun size={32} color="#fbbf24" /><div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>28°C</div><div style={{ fontSize: '10px', opacity: 0.8 }}>Sunny</div></div></div></div>
+          </div>
+          <div className="xp-widget">
+            <div className="widget-title">CPU Pulse</div>
+            <div className="widget-body"><div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '40px' }}><div style={{ width: '40px', background: stats.cpu.load > 80 ? '#ef4444' : '#10b981', height: `${stats.cpu.load}%`, transition: 'height 0.3s' }}></div><div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.cpu.load}%</div></div></div>
+          </div>
         </div>
 
         {clippyVisible && (
-          <div className="clippy-container" onClick={() => setClippyVisible(false)}>
+          <div className="clippy-container">
             <div className="clippy-bubble">{clippyMsg}</div>
-            <div className="clippy-avatar" style={{ background: '#fbbf24', padding: '10px', borderRadius: '50%', border: '2px solid #b45309' }}><Info size={24} color="#000" /></div>
+            <div className="clippy-avatar" onClick={() => setClippyVisible(false)}>
+              <Info size={24} color="#000" />
+            </div>
           </div>
         )}
       </div>
 
       <div className="xp-taskbar">
         <div className={`start-btn ${startMenuOpen ? 'pressed' : ''}`} onClick={(e) => { e.stopPropagation(); setStartMenuOpen(!startMenuOpen); }}>
-          <div className="start-btn-icon"><div className="c1"></div><div className="c2"></div><div className="c3"></div><div className="c4"></div></div>
+          <div className="start-btn-icon"><div className="c1" style={{ background: '#ee3124' }}></div><div className="c2" style={{ background: '#00a651' }}></div><div className="c3" style={{ background: '#00aeef' }}></div><div className="c4" style={{ background: '#fff200' }}></div></div>
           start
         </div>
         <div className="taskbar-instances">{windows.map(win => <div key={win.id} className={`task-instance ${activeWindow === win.id ? 'active' : ''}`} onClick={() => toggleMinimize(win.id)}><span>{win.title}</span></div>)}</div>
-        <div className="taskbar-tray"><div className="tray-clock">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></div>
+        <div className="taskbar-tray">
+          <Wifi size={14} color="white" />
+          <div className="tray-clock">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -196,7 +205,6 @@ const App = () => {
                 <MenuItem label="My Computer" bold onClick={() => openApp(APP_EXPLORER, 'My Computer')} />
                 <div className="menu-sep"></div>
                 <MenuItem label="Control Panel" />
-                <MenuItem label="Set Program Access" />
                 <MenuItem label="Display Properties" onClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
               </div>
             </div>
@@ -231,8 +239,6 @@ const Window = ({ window, children, onClose, onMinimize, isActive, onFocus }) =>
   </motion.div>
 );
 
-const Widget = ({ title, children }) => (<div className="xp-widget"><div className="widget-title">{title}</div><div className="widget-body">{children}</div></div>);
-
 const MenuItem = ({ icon, label, bold, onClick }) => (
   <div className="menu-item" onClick={onClick}>
     {icon && <div className="menu-item-icon">{icon}</div>}
@@ -243,15 +249,17 @@ const MenuItem = ({ icon, label, bold, onClick }) => (
 // --- App Screens ---
 
 const ResumeViewer = () => (
-  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <div style={{ padding: '8px', background: '#ece9d8', borderBottom: '1px solid #999', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <div className="browser-shell">
+    <div className="browser-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Resume.pdf - Reader Shell</span>
       <div style={{ display: 'flex', gap: '15px' }}>
-        <a href="/resume.pdf" download style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><HardDrive size={12} /> Save a copy</a>
-        <a href="/resume.pdf" target="_blank" style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><ExternalLink size={12} /> Popout</a>
+        <a href="/resume.pdf" download style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><HardDrive size={12} /> Save</a>
+        <a href="/resume.pdf" target="_blank" style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><ExternalLink size={12} /> Open</a>
       </div>
     </div>
-    <iframe src="/resume.pdf" title="Resume" style={{ flex: 1, border: 'none' }} />
+    <div className="browser-content">
+      <iframe src="/resume.pdf" title="Resume" />
+    </div>
   </div>
 );
 
@@ -264,8 +272,8 @@ const Calculator = () => {
     else setVal(val === '0' ? b : val + b);
   };
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', padding: '15px', background: '#ece9d8', height: '100%' }}>
-      <div style={{ gridColumn: 'span 4', background: 'white', border: '1px solid #7f9db9', padding: '10px', textAlign: 'right', fontSize: '24px', fontFamily: 'monospace', marginBottom: '10px' }}>{val}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', padding: '15px', background: '#ece9d8', height: '100%', width: '100%' }}>
+      <div style={{ gridColumn: 'span 4', background: 'white', border: '1px solid #7f9db9', padding: '10px', textAlign: 'right', fontSize: '24px', fontFamily: 'monospace', marginBottom: '10px', overflow: 'hidden' }}>{val}</div>
       {btns.map(b => <div key={b} className="calc-btn" style={{ padding: '12px', background: '#f0f0f0', border: '1px solid #999', cursor: 'pointer', textAlign: 'center', boxShadow: '1px 1px 1px white inset' }} onClick={() => handle(b)}>{b}</div>)}
     </div>
   );
@@ -306,13 +314,14 @@ const TaskManager = ({ stats, history }) => (
     <div className="tm-content">
       <div className="tm-stats-left">
         <div className="tm-gauge-card"><span className="tm-gauge-label">CPU Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.cpu.load}%`, background: '#00ff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.cpu.load}%</span></div>
-        <div className="tm-gauge-card"><span className="tm-gauge-label">Commit Charge</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.memory.used}%`, background: '#ffff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.memory.used}%</span></div>
+        <div className="tm-gauge-card"><span className="tm-gauge-label">MEM Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.memory.used}%`, background: '#ffff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.memory.used}%</span></div>
       </div>
       <div className="tm-graph-container">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={history} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <AreaChart data={history} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
             <CartesianGrid stroke="#113311" vertical={false} />
             <Area type="stepAfter" dataKey="cpu" stroke="#00ff00" fill="#003300" isAnimationActive={false} />
+            <Area type="stepAfter" dataKey="memory" stroke="#ffff00" fill="#333300" isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -325,14 +334,13 @@ const FileExplorer = ({ triggerBsod }) => (
     <div className="explorer-side">
       <div className="side-card">
         <div className="side-title">System Tasks</div>
-        <div className="side-link">View hardware info</div>
-        <div className="side-link" onClick={() => window.open('/resume.pdf')}>Export Resume</div>
+        <div className="side-link" onClick={() => window.open('/resume.pdf')}>View Resume</div>
+        <div className="side-link">Hardware Info</div>
       </div>
       <div className="side-card">
         <div className="side-title">Other Places</div>
         <div className="side-link">Desktop</div>
-        <div className="side-link">My Network Places</div>
-        <div className="side-link">My Documents</div>
+        <div className="side-link">Shared Clips</div>
       </div>
     </div>
     <div className="explorer-main">
@@ -340,7 +348,7 @@ const FileExplorer = ({ triggerBsod }) => (
       <div className="explorer-view">
         <div className="explorer-item" onDoubleClick={() => alert('Folder is empty')}><Folder size={48} color="#ffcc00" /><span>Drivers</span></div>
         <div className="explorer-item" onDoubleClick={() => alert('Configuration files are locked')}><Settings size={48} color="#999" /><span>config</span></div>
-        <div className="explorer-item" onDoubleClick={triggerBsod} style={{ filter: 'drop-shadow(0 0 5px rgba(239, 68, 68, 0.3))' }}><AlertCircle size={48} color="#ef4444" /><span>System32.exe</span></div>
+        <div className="explorer-item" onDoubleClick={triggerBsod} style={{ filter: 'shadow(0 0 5px red)' }}><AlertCircle size={48} color="#ef4444" /><span>System32.exe</span></div>
         <div className="explorer-item"><FileText size={48} color="#94a3b8" /><span>kernel.dll</span></div>
         <div className="explorer-item"><FileText size={48} color="#94a3b8" /><span>shell32.dll</span></div>
         <div className="explorer-item"><Music size={48} color="#6366f1" /><span>startup.wav</span></div>
@@ -359,7 +367,6 @@ const WebBrowser = () => {
           <span style={{ fontSize: '11px', color: '#666' }}>Address</span>
           <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && setFrameUrl(url)} />
           <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={() => setFrameUrl(url + '?t=' + Date.now())} />
-          <Search size={14} style={{ cursor: 'pointer' }} />
         </div>
       </div>
       <div className="browser-content">
@@ -369,10 +376,10 @@ const WebBrowser = () => {
   );
 };
 
-const Notepad = () => <textarea style={{ width: '100%', height: '100%', border: 'none', padding: '15px', fontFamily: 'Courier New', outline: 'none' }} defaultValue="System Initialization OK." />;
+const Notepad = () => <textarea style={{ width: '100%', height: '100%', border: 'none', padding: '15px', fontFamily: 'Courier New', outline: 'none' }} defaultValue="System Initialization OK. Ready." />;
 
 const DisplayProps = ({ setWallpaper, wallpaper }) => (
-  <div style={{ padding: '20px', background: '#ece9d8', height: '100%' }}>
+  <div style={{ padding: '20px', background: '#ece9d8', height: '100%', width: '100%' }}>
     <div style={{ background: '#fff', border: '1px solid #999', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
       <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><ImageIcon size={48} color="#3b82f6" /><div><strong>Layout Settings</strong><p style={{ fontSize: '11px', margin: 0 }}>Select a new desktop background</p></div></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
