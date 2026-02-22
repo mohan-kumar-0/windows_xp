@@ -5,7 +5,8 @@ import {
   FileText, Folder, Trash, X, Minus, Square, Search,
   ArrowLeft, ArrowRight, RefreshCw, Home, Power,
   Monitor, Settings, User, Clock, Sun, Info, ExternalLink,
-  Music, Image as ImageIcon, Mail, Calculator as CalcIcon, Palette, AlertCircle
+  Music, Image as ImageIcon, Mail, Calculator as CalcIcon, Palette, AlertCircle,
+  Menu, ChevronLeft
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -27,7 +28,18 @@ const WALLPAPERS = [
   'https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=3540'
 ];
 
+const useMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handle = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+  return isMobile;
+};
+
 const App = () => {
+  const isMobile = useMobile();
   const [booting, setBooting] = useState(true);
   const [windows, setWindows] = useState([]);
   const [activeWindow, setActiveWindow] = useState(null);
@@ -36,6 +48,7 @@ const App = () => {
   const [wallpaper, setWallpaper] = useState(WALLPAPERS[0]);
   const [clippyVisible, setClippyVisible] = useState(true);
   const [clippyMsg, setClippyMsg] = useState("It looks like you're trying to view a resume. Would you like some help?");
+  const [trayOpen, setTrayOpen] = useState(false);
 
   const [stats, setStats] = useState({
     cpu: { load: 0, temp: 42 },
@@ -62,7 +75,7 @@ const App = () => {
     }, 1000);
 
     const clippyTimer = setInterval(() => {
-      const msgs = ["Need help drawing in Paint?", "The task manager shows real simulated data!", "Check out the resume in My Computer.", "You can change wallpapers in Display Settings.", "Don't open System32.exe... unless you're curious."];
+      const msgs = ["Tap things twice to open them!", "Check out the Performance tab.", "Don't open System32.exe!", "You can change wallpapers in Display."];
       setClippyMsg(msgs[Math.floor(Math.random() * msgs.length)]);
     }, 15000);
 
@@ -76,7 +89,13 @@ const App = () => {
       setWindows(prev => prev.map(w => w.id === appId ? { ...w, minimized: false, zIndex: Math.max(0, ...prev.map(win => win.zIndex)) + 1 } : w));
       return;
     }
-    const newWindow = { id: appId, title, zIndex: windows.length + 10, minimized: false, position: { x: 100 + windows.length * 30, y: 80 + windows.length * 30 } };
+    const newWindow = {
+      id: appId,
+      title,
+      zIndex: windows.length + 10,
+      minimized: false,
+      position: isMobile ? { x: 0, y: 0 } : { x: 100 + windows.length * 40, y: 80 + windows.length * 40 }
+    };
     setWindows([...windows, newWindow]);
     setActiveWindow(appId);
   };
@@ -86,7 +105,14 @@ const App = () => {
     if (activeWindow === id) setActiveWindow(null);
   };
 
-  const toggleMinimize = (id) => setWindows(windows.map(w => w.id === id ? { ...w, minimized: !w.minimized } : w));
+  const toggleMinimize = (id) => {
+    if (isMobile) {
+      // Switch between windows if they exist
+      setActiveWindow(id);
+    } else {
+      setWindows(windows.map(w => w.id === id ? { ...w, minimized: !w.minimized } : w));
+    }
+  };
 
   const focusWindow = (id) => {
     setActiveWindow(id);
@@ -106,9 +132,6 @@ const App = () => {
       <div className="bsod-header">WINDOWS</div>
       <p style={{ marginTop: '20px' }}>A problem has been detected and Windows has been shut down to prevent damage to your computer.</p>
       <p>DRV_FAULT_SYSTEM32_EXE</p>
-      <p>If this is the first time you've seen this Stop error screen, restart your computer. If this screen appears again, follow these steps:</p>
-      <p>Check to make sure any new hardware or software is properly installed. If this is a new installation, ask your hardware or software manufacturer for any Windows updates you might need.</p>
-      <p>Technical information:</p>
       <p>*** STOP: 0x00000050 (0xFD3094C2, 0x00000001, 0xFBFE7617, 0x00000000)</p>
       <p style={{ marginTop: '40px' }}>Beginning dump of physical memory... _</p>
     </div>
@@ -118,9 +141,9 @@ const App = () => {
     <div className="xp-boot-wrapper">
       <div className="xp-logo">
         <div className="ms-text">Microsoft</div>
-        <div className="main-logo">Windows<span>XP</span></div>
+        <div className="main-logo" style={{ fontSize: isMobile ? '40px' : '56px' }}>Windows<span>XP</span></div>
       </div>
-      <div className="boot-loader">
+      <div className="boot-loader" style={{ width: isMobile ? '140px' : '180px' }}>
         <div className="loader-chunks"><div className="l-chunk"></div><div className="l-chunk"></div><div className="l-chunk"></div></div>
       </div>
       <div className="copyright">Copyright © Microsoft Corporation</div>
@@ -128,43 +151,52 @@ const App = () => {
   );
 
   return (
-    <div className="xp-container">
-      <div className="desktop" onClick={() => { setActiveWindow(null); setStartMenuOpen(false); }} style={{ backgroundImage: `url(${wallpaper})` }}>
-        <DesktopIcon icon={<FileText size={40} color="#0058e6" />} label="Resume.pdf" onDoubleClick={() => openApp(APP_RESUME, 'Resume Viewer')} />
-        <DesktopIcon icon={<HardDrive size={34} color="#0058e6" />} label="My Computer" onDoubleClick={() => openApp(APP_EXPLORER, 'My Computer')} />
-        <DesktopIcon icon={<Monitor size={34} color="#46ac46" />} label="Task Manager" onDoubleClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} />
-        <DesktopIcon icon={<Palette size={34} color="#ff8a00" />} label="Paint" onDoubleClick={() => openApp(APP_PAINT, 'Paint')} />
-        <DesktopIcon icon={<CalcIcon size={34} color="#94a3b8" />} label="Calculator" onDoubleClick={() => openApp(APP_CALC, 'Calculator')} />
-        <DesktopIcon icon={<Globe size={34} color="#ff8a00" />} label="Web Browser" onDoubleClick={() => openApp(APP_BROWSER, 'Internet Explorer')} />
-        <DesktopIcon icon={<Settings size={34} color="#6366f1" />} label="Display" onDoubleClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
+    <div className={`xp-container ${isMobile ? 'mobile' : ''}`}>
+      <div className="desktop" onClick={() => { setActiveWindow(null); setStartMenuOpen(false); setTrayOpen(false); }} style={{ backgroundImage: `url(${wallpaper})` }}>
+        <DesktopIcon icon={<FileText size={isMobile ? 48 : 40} color="#0058e6" />} label="Resume.pdf" onDoubleClick={() => openApp(APP_RESUME, 'Resume Viewer')} />
+        <DesktopIcon icon={<HardDrive size={isMobile ? 42 : 34} color="#0058e6" />} label="My Computer" onDoubleClick={() => openApp(APP_EXPLORER, 'My Computer')} />
+        <DesktopIcon icon={<Monitor size={isMobile ? 42 : 34} color="#46ac46" />} label="Task Manager" onDoubleClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} />
+        <DesktopIcon icon={<Palette size={isMobile ? 42 : 34} color="#ff8a00" />} label="Paint" onDoubleClick={() => openApp(APP_PAINT, 'Paint')} />
+        <DesktopIcon icon={<CalcIcon size={isMobile ? 42 : 34} color="#94a3b8" />} label="Calculator" onDoubleClick={() => openApp(APP_CALC, 'Calculator')} />
+        <DesktopIcon icon={<Globe size={isMobile ? 42 : 34} color="#ff8a00" />} label="Web Browser" onDoubleClick={() => openApp(APP_BROWSER, 'Internet Explorer')} />
+        <DesktopIcon icon={<Settings size={isMobile ? 42 : 34} color="#6366f1" />} label="Display" onDoubleClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
 
         <AnimatePresence>
-          {windows.map(win => !win.minimized && (
-            <Window key={win.id} window={win} isActive={activeWindow === win.id} onClose={() => closeWindow(win.id)} onMinimize={() => toggleMinimize(win.id)} onFocus={() => focusWindow(win.id)}>
-              {win.id === APP_RESUME && <ResumeViewer />}
-              {win.id === APP_TASK_MANAGER && <TaskManager stats={stats} history={history} />}
-              {win.id === APP_EXPLORER && <FileExplorer triggerBsod={triggerBsod} />}
-              {win.id === APP_BROWSER && <WebBrowser />}
-              {win.id === APP_PAINT && <PaintApp />}
-              {win.id === APP_CALC && <Calculator />}
-              {win.id === APP_DISPLAY && <DisplayProps setWallpaper={setWallpaper} wallpaper={wallpaper} />}
-              {win.id === APP_NOTEPAD && <Notepad />}
+          {windows.map(win => (isMobile ? activeWindow === win.id : !win.minimized) && (
+            <Window key={win.id} window={win} isMobile={isMobile} isActive={activeWindow === win.id} onClose={() => closeWindow(win.id)} onMinimize={() => toggleMinimize(win.id)} onFocus={() => focusWindow(win.id)}>
+              {win.id === APP_RESUME && <ResumeViewer isMobile={isMobile} />}
+              {win.id === APP_TASK_MANAGER && <TaskManager stats={stats} history={history} isMobile={isMobile} />}
+              {win.id === APP_EXPLORER && <FileExplorer triggerBsod={triggerBsod} isMobile={isMobile} />}
+              {win.id === APP_BROWSER && <WebBrowser isMobile={isMobile} />}
+              {win.id === APP_PAINT && <PaintApp isMobile={isMobile} />}
+              {win.id === APP_CALC && <Calculator isMobile={isMobile} />}
+              {win.id === APP_DISPLAY && <DisplayProps setWallpaper={setWallpaper} wallpaper={wallpaper} isMobile={isMobile} />}
+              {win.id === APP_NOTEPAD && <Notepad isMobile={isMobile} />}
             </Window>
           ))}
         </AnimatePresence>
 
-        <div className="widgets-tray">
-          <div className="xp-widget">
-            <div className="widget-title">Weather</div>
-            <div className="widget-body"><div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><Sun size={32} color="#fbbf24" /><div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>28°C</div><div style={{ fontSize: '10px', opacity: 0.8 }}>Sunny</div></div></div></div>
-          </div>
-          <div className="xp-widget">
-            <div className="widget-title">CPU Pulse</div>
-            <div className="widget-body"><div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '40px' }}><div style={{ width: '40px', background: stats.cpu.load > 80 ? '#ef4444' : '#10b981', height: `${stats.cpu.load}%`, transition: 'height 0.3s' }}></div><div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.cpu.load}%</div></div></div>
-          </div>
-        </div>
+        <AnimatePresence>
+          {(trayOpen || !isMobile) && (
+            <motion.div
+              initial={isMobile ? { x: 200 } : { opacity: 0 }}
+              animate={isMobile ? { x: 0 } : { opacity: 1 }}
+              exit={isMobile ? { x: 200 } : { opacity: 0 }}
+              className="widgets-tray"
+            >
+              <div className="xp-widget">
+                <div className="widget-title">Weather</div>
+                <div className="widget-body"><div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><Sun size={32} color="#fbbf24" /><div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>28°C</div><div style={{ fontSize: '10px', opacity: 0.8 }}>Sunny</div></div></div></div>
+              </div>
+              <div className="xp-widget">
+                <div className="widget-title">CPU Pulse</div>
+                <div className="widget-body"><div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '40px' }}><div style={{ width: '40px', background: stats.cpu.load > 80 ? '#ef4444' : '#10b981', height: `${stats.cpu.load}%`, transition: 'height 0.3s' }}></div><div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.cpu.load}%</div></div></div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {clippyVisible && (
+        {clippyVisible && !isMobile && (
           <div className="clippy-container">
             <div className="clippy-bubble">{clippyMsg}</div>
             <div className="clippy-avatar" onClick={() => setClippyVisible(false)}>
@@ -177,10 +209,17 @@ const App = () => {
       <div className="xp-taskbar">
         <div className={`start-btn ${startMenuOpen ? 'pressed' : ''}`} onClick={(e) => { e.stopPropagation(); setStartMenuOpen(!startMenuOpen); }}>
           <div className="start-btn-icon"><div className="c1" style={{ background: '#ee3124' }}></div><div className="c2" style={{ background: '#00a651' }}></div><div className="c3" style={{ background: '#00aeef' }}></div><div className="c4" style={{ background: '#fff200' }}></div></div>
-          start
+          {isMobile ? '' : 'start'}
         </div>
-        <div className="taskbar-instances">{windows.map(win => <div key={win.id} className={`task-instance ${activeWindow === win.id ? 'active' : ''}`} onClick={() => toggleMinimize(win.id)}><span>{win.title}</span></div>)}</div>
-        <div className="taskbar-tray">
+        <div className="taskbar-instances">
+          {isMobile && activeWindow && (
+            <div className="task-instance active mobile-back" onClick={() => setActiveWindow(null)}>
+              <ChevronLeft size={16} /> Back
+            </div>
+          )}
+          {!isMobile && windows.map(win => <div key={win.id} className={`task-instance ${activeWindow === win.id ? 'active' : ''}`} onClick={() => toggleMinimize(win.id)}><span>{win.title}</span></div>)}
+        </div>
+        <div className="taskbar-tray" onClick={(e) => { e.stopPropagation(); isMobile && setTrayOpen(!trayOpen); }}>
           <Wifi size={14} color="white" />
           <div className="tray-clock">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
         </div>
@@ -188,25 +227,24 @@ const App = () => {
 
       <AnimatePresence>
         {startMenuOpen && (
-          <motion.div className="start-menu" initial={{ y: 200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}>
+          <motion.div className="start-menu"
+            initial={{ y: 200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+            style={{ width: isMobile ? '100%' : '380px', left: 0, right: 0 }}
+          >
             <div className="start-menu-header"><div className="user-avatar" style={{ background: '#245edb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={30} color="white" /></div><span>Administrator</span></div>
-            <div className="start-menu-body">
+            <div className="start-menu-body" style={{ gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr' }}>
               <div className="menu-left">
-                <MenuItem icon={<Mail size={18} color="#245edb" />} label="Outlook Express" />
                 <MenuItem icon={<Globe size={18} color="#245edb" />} label="Internet Explorer" onClick={() => openApp(APP_BROWSER, 'Internet Explorer')} />
-                <div className="menu-sep"></div>
-                <MenuItem icon={<Palette size={18} color="#245edb" />} label="Paint" onClick={() => openApp(APP_PAINT, 'Paint')} />
                 <MenuItem icon={<CalcIcon size={18} color="#245edb" />} label="Calculator" onClick={() => openApp(APP_CALC, 'Calculator')} />
+                <MenuItem icon={<Palette size={18} color="#245edb" />} label="Paint" onClick={() => openApp(APP_PAINT, 'Paint')} />
                 <MenuItem icon={<Monitor size={18} color="#245edb" />} label="Task Manager" onClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} />
               </div>
-              <div className="menu-right">
-                <MenuItem label="My Documents" bold />
-                <MenuItem label="My Pictures" bold />
-                <MenuItem label="My Computer" bold onClick={() => openApp(APP_EXPLORER, 'My Computer')} />
-                <div className="menu-sep"></div>
-                <MenuItem label="Control Panel" />
-                <MenuItem label="Display Properties" onClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
-              </div>
+              {!isMobile && (
+                <div className="menu-right">
+                  <MenuItem label="My Computer" bold onClick={() => openApp(APP_EXPLORER, 'My Computer')} />
+                  <MenuItem label="Display Properties" onClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
+                </div>
+              )}
             </div>
             <div className="start-menu-footer"><div className="footer-btn" onClick={() => window.location.reload()}><Power size={18} /> Log Off</div><div className="footer-btn" onClick={() => triggerBsod()}><Power size={18} /> Shutdown</div></div>
           </motion.div>
@@ -225,16 +263,16 @@ const DesktopIcon = ({ icon, label, onDoubleClick }) => (
   </div>
 );
 
-const Window = ({ window, children, onClose, onMinimize, isActive, onFocus }) => (
-  <motion.div drag dragMomentum={false} onPointerDown={onFocus} className={`xp-window ${!isActive ? 'inactive' : ''}`}
+const Window = ({ window, children, onClose, onMinimize, isActive, onFocus, isMobile }) => (
+  <motion.div drag={!isMobile} dragMomentum={false} onPointerDown={onFocus} className={`xp-window ${!isActive ? 'inactive' : ''} ${isMobile ? 'mobile-max' : ''}`}
     style={{
       zIndex: window.zIndex,
-      left: window.position.x,
-      top: window.position.y,
-      width: window.id === APP_CALC ? 320 : (window.id === APP_PAINT ? 800 : (window.id === APP_DISPLAY ? 480 : 960)),
-      height: window.id === APP_CALC ? 400 : (window.id === APP_PAINT ? 620 : (window.id === APP_DISPLAY ? 520 : 680))
+      left: isMobile ? 0 : window.position.x,
+      top: isMobile ? 0 : window.position.y,
+      width: isMobile ? '100%' : (window.id === APP_CALC ? 320 : (window.id === APP_PAINT ? 800 : (window.id === APP_DISPLAY ? 480 : 960))),
+      height: isMobile ? '100%' : (window.id === APP_CALC ? 400 : (window.id === APP_PAINT ? 620 : (window.id === APP_DISPLAY ? 520 : 680)))
     }}>
-    <div className="window-bar"><span>{window.title}</span><div className="window-actions"><div className="win-btn" onClick={onMinimize}><Minus size={14} color="white" /></div><div className="win-btn"><Square size={12} color="white" /></div><div className="win-btn win-btn-close" onClick={onClose}><X size={14} color="white" /></div></div></div>
+    <div className="window-bar"><span>{window.title}</span><div className="window-actions">{!isMobile && <div className="win-btn" onClick={onMinimize}><Minus size={14} color="white" /></div>}<div className="win-btn win-btn-close" onClick={onClose}><X size={14} color="white" /></div></div></div>
     <div className="win-inner">{children}</div>
   </motion.div>
 );
@@ -242,7 +280,7 @@ const Window = ({ window, children, onClose, onMinimize, isActive, onFocus }) =>
 const MenuItem = ({ icon, label, bold, onClick }) => (
   <div className="menu-item" onClick={onClick}>
     {icon && <div className="menu-item-icon">{icon}</div>}
-    <div className="menu-item-content"><span style={{ fontWeight: bold ? 'bold' : 'normal', fontSize: '11px' }}>{label}</span></div>
+    <div className="menu-item-content"><span style={{ fontWeight: bold ? 'bold' : 'normal', fontSize: '13px' }}>{label}</span></div>
   </div>
 );
 
@@ -251,10 +289,9 @@ const MenuItem = ({ icon, label, bold, onClick }) => (
 const ResumeViewer = () => (
   <div className="browser-shell">
     <div className="browser-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Resume.pdf - Reader Shell</span>
+      <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Resume.pdf</span>
       <div style={{ display: 'flex', gap: '15px' }}>
         <a href="/resume.pdf" download style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><HardDrive size={12} /> Save</a>
-        <a href="/resume.pdf" target="_blank" style={{ fontSize: '10px', color: '#245edb', textDecoration: 'none' }}><ExternalLink size={12} /> Open</a>
       </div>
     </div>
     <div className="browser-content">
@@ -273,13 +310,13 @@ const Calculator = () => {
   };
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px', padding: '15px', background: '#ece9d8', height: '100%', width: '100%' }}>
-      <div style={{ gridColumn: 'span 4', background: 'white', border: '1px solid #7f9db9', padding: '10px', textAlign: 'right', fontSize: '24px', fontFamily: 'monospace', marginBottom: '10px', overflow: 'hidden' }}>{val}</div>
+      <div style={{ gridColumn: 'span 4', background: 'white', border: '1px solid #7f9db9', padding: '10px', textAlign: 'right', fontSize: '24px', fontFamily: 'monospace', marginBottom: '10px' }}>{val}</div>
       {btns.map(b => <div key={b} className="calc-btn" style={{ padding: '12px', background: '#f0f0f0', border: '1px solid #999', cursor: 'pointer', textAlign: 'center', boxShadow: '1px 1px 1px white inset' }} onClick={() => handle(b)}>{b}</div>)}
     </div>
   );
 };
 
-const PaintApp = () => {
+const PaintApp = ({ isMobile }) => {
   const canvasRef = useRef(null);
   const [color, setColor] = useState('#000');
   const [drawing, setDrawing] = useState(false);
@@ -288,34 +325,38 @@ const PaintApp = () => {
     if (!drawing) return;
     const ctx = canvasRef.current.getContext('2d');
     const rect = canvasRef.current.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
     ctx.fillStyle = color;
-    ctx.fillRect(e.clientX - rect.left - 2, e.clientY - rect.top - 2, 5, 5);
+    ctx.fillRect(clientX - rect.left - 2, clientY - rect.top - 2, 5, 5);
   };
 
   return (
     <div className="paint-container">
-      <div className="paint-tools">
-        {['#000', '#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#888', '#fff'].map(c => <div key={c} style={{ width: '25px', height: '25px', background: c, border: color === c ? '2px solid white' : '1px solid #000', cursor: 'pointer' }} onClick={() => setColor(c)} />)}
+      <div className="paint-tools" style={{ width: isMobile ? '40px' : '50px' }}>
+        {['#000', '#f12', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#888', '#fff'].map(c => <div key={c} style={{ width: '25px', height: '25px', background: c, border: color === c ? '2px solid white' : '1px solid #000', cursor: 'pointer' }} onClick={() => setColor(c)} />)}
         <div onClick={() => canvasRef.current.getContext('2d').clearRect(0, 0, 800, 600)} style={{ cursor: 'pointer', fontSize: '10px', marginTop: '15px' }}><Trash size={20} /></div>
       </div>
       <div className="paint-canvas-area">
-        <canvas ref={canvasRef} width={700} height={500} className="paint-canvas" onMouseDown={() => setDrawing(true)} onMouseUp={() => setDrawing(false)} onMouseMove={draw} />
+        <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight - 80} className="paint-canvas" onMouseDown={() => setDrawing(true)} onMouseUp={() => setDrawing(false)} onMouseMove={draw} onTouchStart={() => setDrawing(true)} onTouchEnd={() => setDrawing(false)} onTouchMove={draw} />
       </div>
     </div>
   );
 };
 
-const TaskManager = ({ stats, history }) => (
+const TaskManager = ({ stats, history, isMobile }) => (
   <div className="tm-container">
     <div className="tm-tabs">
       <div className="tm-tab active">Performance</div>
-      <div className="tm-tab">Processes</div>
+      {!isMobile && <div className="tm-tab">Processes</div>}
     </div>
-    <div className="tm-content">
-      <div className="tm-stats-left">
-        <div className="tm-gauge-card"><span className="tm-gauge-label">CPU Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.cpu.load}%`, background: '#00ff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.cpu.load}%</span></div>
-        <div className="tm-gauge-card"><span className="tm-gauge-label">MEM Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.memory.used}%`, background: '#ffff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.memory.used}%</span></div>
-      </div>
+    <div className="tm-content" style={{ gridTemplateColumns: isMobile ? '1fr' : '130px 1fr' }}>
+      {!isMobile && (
+        <div className="tm-stats-left">
+          <div className="tm-gauge-card"><span className="tm-gauge-label">CPU Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.cpu.load}%`, background: '#00ff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.cpu.load}%</span></div>
+          <div className="tm-gauge-card"><span className="tm-gauge-label">MEM Usage</span><div className="tm-gauge-box"><div className="tm-gauge-fill" style={{ height: `${stats.memory.used}%`, background: '#ffff00' }}></div></div><span style={{ fontSize: '18px', marginTop: '5px' }}>{stats.memory.used}%</span></div>
+        </div>
+      )}
       <div className="tm-graph-container">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={history} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
@@ -325,33 +366,33 @@ const TaskManager = ({ stats, history }) => (
           </AreaChart>
         </ResponsiveContainer>
       </div>
+      {isMobile && <div style={{ background: '#000', color: '#0f0', padding: '10px', fontSize: '14px', fontFamily: 'monospace' }}>CPU: {stats.cpu.load}% | MEM: {stats.memory.used}%</div>}
     </div>
   </div>
 );
 
-const FileExplorer = ({ triggerBsod }) => (
+const FileExplorer = ({ triggerBsod, isMobile }) => (
   <div className="explorer-layout">
-    <div className="explorer-side">
-      <div className="side-card">
-        <div className="side-title">System Tasks</div>
-        <div className="side-link" onClick={() => window.open('/resume.pdf')}>View Resume</div>
-        <div className="side-link">Hardware Info</div>
+    {!isMobile && (
+      <div className="explorer-side">
+        <div className="side-card">
+          <div className="side-title">System Tasks</div>
+          <div className="side-link" onClick={() => window.open('/resume.pdf')}>View Resume</div>
+        </div>
+        <div className="side-card">
+          <div className="side-title">Other Places</div>
+          <div className="side-link">Desktop</div>
+        </div>
       </div>
-      <div className="side-card">
-        <div className="side-title">Other Places</div>
-        <div className="side-link">Desktop</div>
-        <div className="side-link">Shared Clips</div>
-      </div>
-    </div>
+    )}
     <div className="explorer-main">
       <div className="explorer-nav">Address: C:\WINDOWS\System32</div>
-      <div className="explorer-view">
-        <div className="explorer-item" onDoubleClick={() => alert('Folder is empty')}><Folder size={48} color="#ffcc00" /><span>Drivers</span></div>
-        <div className="explorer-item" onDoubleClick={() => alert('Configuration files are locked')}><Settings size={48} color="#999" /><span>config</span></div>
-        <div className="explorer-item" onDoubleClick={triggerBsod} style={{ filter: 'shadow(0 0 5px red)' }}><AlertCircle size={48} color="#ef4444" /><span>System32.exe</span></div>
-        <div className="explorer-item"><FileText size={48} color="#94a3b8" /><span>kernel.dll</span></div>
-        <div className="explorer-item"><FileText size={48} color="#94a3b8" /><span>shell32.dll</span></div>
-        <div className="explorer-item"><Music size={48} color="#6366f1" /><span>startup.wav</span></div>
+      <div className="explorer-view" style={{ gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(60px, 1fr))' : 'repeat(auto-fill, minmax(80px, 1fr))' }}>
+        <div className="explorer-item"><Folder size={40} color="#ffcc00" /><span>Drivers</span></div>
+        <div className="explorer-item"><Settings size={40} color="#999" /><span>config</span></div>
+        <div className="explorer-item" onClick={triggerBsod}><AlertCircle size={40} color="#ef4444" /><span>System32</span></div>
+        <div className="explorer-item"><FileText size={40} color="#94a3b8" /><span>kernel.dll</span></div>
+        <div className="explorer-item"><Music size={40} color="#6366f1" /><span>startup</span></div>
       </div>
     </div>
   </div>
@@ -364,7 +405,6 @@ const WebBrowser = () => {
     <div className="browser-shell">
       <div className="browser-toolbar">
         <div className="address-bar">
-          <span style={{ fontSize: '11px', color: '#666' }}>Address</span>
           <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && setFrameUrl(url)} />
           <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={() => setFrameUrl(url + '?t=' + Date.now())} />
         </div>
@@ -376,18 +416,17 @@ const WebBrowser = () => {
   );
 };
 
-const Notepad = () => <textarea style={{ width: '100%', height: '100%', border: 'none', padding: '15px', fontFamily: 'Courier New', outline: 'none' }} defaultValue="System Initialization OK. Ready." />;
+const Notepad = () => <textarea style={{ width: '100%', height: '100%', border: 'none', padding: '15px', fontFamily: 'Courier New', outline: 'none' }} defaultValue="System Initialization OK." />;
 
-const DisplayProps = ({ setWallpaper, wallpaper }) => (
-  <div style={{ padding: '20px', background: '#ece9d8', height: '100%', width: '100%' }}>
-    <div style={{ background: '#fff', border: '1px solid #999', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-      <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><ImageIcon size={48} color="#3b82f6" /><div><strong>Layout Settings</strong><p style={{ fontSize: '11px', margin: 0 }}>Select a new desktop background</p></div></div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+const DisplayProps = ({ setWallpaper, wallpaper, isMobile }) => (
+  <div style={{ padding: isMobile ? '10px' : '20px', background: '#ece9d8', height: '100%', width: '100%' }}>
+    <div style={{ background: '#fff', border: '1px solid #999', padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}><ImageIcon size={40} color="#3b82f6" /><div><strong>Wallpapers</strong></div></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
         {WALLPAPERS.map((wp, i) => (
-          <div key={i} onClick={() => setWallpaper(wp)} style={{ cursor: 'pointer', border: wallpaper === wp ? '4px solid #245edb' : '1px solid #ccc', height: '80px', backgroundImage: `url(${wp})`, backgroundSize: 'cover', borderRadius: '4px' }} title={`Wallpaper ${i + 1}`} />
+          <div key={i} onClick={() => setWallpaper(wp)} style={{ cursor: 'pointer', border: wallpaper === wp ? '3px solid #245edb' : '1px solid #ccc', height: '60px', backgroundImage: `url(${wp})`, backgroundSize: 'cover', borderRadius: '4px' }} />
         ))}
       </div>
-      <div style={{ marginTop: '20px', fontSize: '11px', color: '#666' }}>Settings will be applied instantly.</div>
     </div>
   </div>
 );
