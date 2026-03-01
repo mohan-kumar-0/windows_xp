@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, RefreshCw, Home, Power,
   Monitor, Settings, User, Clock, Sun, Info, ExternalLink,
   Music, Image as ImageIcon, Mail, Calculator as CalcIcon, Palette, AlertCircle,
-  Menu, ChevronLeft
+  Menu, ChevronLeft, CheckCircle, StickyNote, Bomb, Layout, FolderPlus, FilePlus, Trash2
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -21,6 +21,19 @@ const APP_RESUME = 'resume-viewer';
 const APP_PAINT = 'paint';
 const APP_CALC = 'calculator';
 const APP_DISPLAY = 'display-properties';
+const APP_MINESWEEPER = 'minesweeper';
+const APP_SOLITAIRE = 'solitaire';
+const APP_TODO = 'todo';
+const APP_NOTES = 'notes';
+
+import Minesweeper from './apps/Minesweeper';
+import Solitaire from './apps/Solitaire';
+import PaintApp from './apps/PaintApp';
+import TodoApp from './apps/TodoApp';
+import NotesApp from './apps/NotesApp';
+import Browser from './apps/Browser';
+import NotepadApp from './apps/Notepad';
+import { getFileSystem, saveFileSystem, findNodeById, updateNodeInTree, addNodeToParent, deleteNode, moveToTrash, emptyTrash } from './FileSystem';
 
 const WALLPAPERS = [
   'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=3540',
@@ -49,6 +62,11 @@ const App = () => {
   const [clippyVisible, setClippyVisible] = useState(true);
   const [clippyMsg, setClippyMsg] = useState("It looks like you're trying to view a resume. Would you like some help?");
   const [trayOpen, setTrayOpen] = useState(false);
+  const [fs, setFs] = useState(getFileSystem());
+  const [currentFolderId, setCurrentFolderId] = useState('c-drive');
+  const [openFile, setOpenFile] = useState(null);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, options: [] });
+  const recycleBinRef = useRef(null);
 
   const [stats, setStats] = useState({
     cpu: { load: 0, temp: 42 },
@@ -82,8 +100,12 @@ const App = () => {
     return () => { clearTimeout(bootTimer); clearInterval(interval); clearInterval(clippyTimer); };
   }, []);
 
-  const openApp = (appId, title) => {
+  const openApp = (appId, title, params = {}) => {
     setStartMenuOpen(false);
+    if (appId === APP_NOTEPAD && params.file) {
+      setOpenFile(params.file);
+    }
+
     if (windows.find(w => w.id === appId)) {
       setActiveWindow(appId);
       setWindows(prev => prev.map(w => w.id === appId ? { ...w, minimized: false, zIndex: Math.max(0, ...prev.map(win => win.zIndex)) + 1 } : w));
@@ -94,7 +116,8 @@ const App = () => {
       title,
       zIndex: windows.length + 10,
       minimized: false,
-      position: isMobile ? { x: 0, y: 0 } : { x: 100 + windows.length * 40, y: 80 + windows.length * 40 }
+      position: isMobile ? { x: 0, y: 0 } : { x: 100 + windows.length * 40, y: 80 + windows.length * 40 },
+      params
     };
     setWindows([...windows, newWindow]);
     setActiveWindow(appId);
@@ -121,6 +144,63 @@ const App = () => {
       return prev.map(w => w.id === id ? { ...w, zIndex: maxZ + 1 } : w);
     });
   };
+
+  const showContextMenu = (e, options) => {
+    e.preventDefault();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, options });
+  };
+
+  const handleDragIconEnd = (e, info, nodeId, nodeName) => {
+    if (!recycleBinRef.current) return;
+    const binRect = recycleBinRef.current.getBoundingClientRect();
+    const { x, y } = info.point;
+
+    if (x >= binRect.left && x <= binRect.right && y >= binRect.top && y <= binRect.bottom) {
+      if (nodeId && confirm(`Move ${nodeName} to Recycle Bin?`)) {
+        setFs(moveToTrash(fs, nodeId));
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handle = () => setContextMenu(prev => ({ ...prev, visible: false }));
+    window.addEventListener('click', handle);
+    return () => window.removeEventListener('click', handle);
+  }, []);
+
+  const refreshFs = () => setFs(getFileSystem());
+
+  const desktopOptions = [
+    { label: 'Arrange Icons By', action: () => { } },
+    { label: 'Refresh', action: refreshFs },
+    { type: 'sep' },
+    {
+      label: 'New Folder', action: () => {
+        const name = prompt('New Folder Name:');
+        if (name) setFs(addNodeToParent(fs, 'desktop', { id: 'folder-' + Date.now(), name, type: 'folder', children: [] }));
+      }
+    },
+    {
+      label: 'New Text Document', action: () => {
+        const name = prompt('New File Name:');
+        if (name) setFs(addNodeToParent(fs, 'desktop', { id: 'file-' + Date.now(), name, type: 'file', content: '' }));
+      }
+    },
+    { type: 'sep' },
+    { label: 'Properties', action: () => openApp(APP_DISPLAY, 'Display Properties') }
+  ];
+
+  const iconMenu = (id, action) => [
+    { label: 'Open', action, bold: true },
+    { label: 'Pin to Start Menu', action: () => { } },
+    { type: 'sep' },
+    { label: 'Send To', action: () => { } },
+    { type: 'sep' },
+    { label: 'Delete', action: () => { if (id && confirm('Move to Recycle Bin?')) setFs(moveToTrash(fs, id)); } },
+    { label: 'Rename', action: () => { } },
+    { type: 'sep' },
+    { label: 'Properties', action: () => { } }
+  ];
 
   const triggerBsod = () => {
     setBsod(true);
@@ -152,26 +232,105 @@ const App = () => {
 
   return (
     <div className={`xp-container ${isMobile ? 'mobile' : ''}`}>
-      <div className="desktop" onClick={() => { setActiveWindow(null); setStartMenuOpen(false); setTrayOpen(false); }} style={{ backgroundImage: `url(${wallpaper})` }}>
-        <DesktopIcon icon={<FileText size={isMobile ? 48 : 40} color="#0058e6" />} label="Resume.pdf" onDoubleClick={() => openApp(APP_RESUME, 'Resume Viewer')} />
-        <DesktopIcon icon={<HardDrive size={isMobile ? 42 : 34} color="#0058e6" />} label="My Computer" onDoubleClick={() => openApp(APP_EXPLORER, 'My Computer')} />
-        <DesktopIcon icon={<Monitor size={isMobile ? 42 : 34} color="#46ac46" />} label="Task Manager" onDoubleClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} />
-        <DesktopIcon icon={<Palette size={isMobile ? 42 : 34} color="#ff8a00" />} label="Paint" onDoubleClick={() => openApp(APP_PAINT, 'Paint')} />
-        <DesktopIcon icon={<CalcIcon size={isMobile ? 42 : 34} color="#94a3b8" />} label="Calculator" onDoubleClick={() => openApp(APP_CALC, 'Calculator')} />
-        <DesktopIcon icon={<Globe size={isMobile ? 42 : 34} color="#ff8a00" />} label="Web Browser" onDoubleClick={() => openApp(APP_BROWSER, 'Internet Explorer')} />
-        <DesktopIcon icon={<Settings size={isMobile ? 42 : 34} color="#6366f1" />} label="Display" onDoubleClick={() => openApp(APP_DISPLAY, 'Display Properties')} />
+      <div
+        className="desktop"
+        onClick={() => { setActiveWindow(null); setStartMenuOpen(false); setTrayOpen(false); }}
+        onContextMenu={(e) => showContextMenu(e, desktopOptions)}
+        style={{ backgroundImage: `url(${wallpaper})` }}
+      >
+        <DesktopIcon icon={<FileText size={isMobile ? 48 : 40} color="#0058e6" />} label="Resume.pdf" onDoubleClick={() => openApp(APP_RESUME, 'Resume Viewer')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_RESUME, 'Resume Viewer')))} />
+        <DesktopIcon icon={<HardDrive size={isMobile ? 42 : 34} color="#0058e6" />} label="My Computer" onDoubleClick={() => { setCurrentFolderId('c-drive'); openApp(APP_EXPLORER, 'My Computer'); }} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => { setCurrentFolderId('c-drive'); openApp(APP_EXPLORER, 'My Computer'); }))} />
+        <DesktopIcon icon={<Monitor size={isMobile ? 42 : 34} color="#46ac46" />} label="Task Manager" onDoubleClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_TASK_MANAGER, 'Task Manager')))} />
+        <DesktopIcon icon={<Palette size={isMobile ? 42 : 34} color="#ff8a00" />} label="Paint" onDoubleClick={() => openApp(APP_PAINT, 'Paint')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_PAINT, 'Paint')))} />
+        <DesktopIcon icon={<CalcIcon size={isMobile ? 42 : 34} color="#94a3b8" />} label="Calculator" onDoubleClick={() => openApp(APP_CALC, 'Calculator')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_CALC, 'Calculator')))} />
+        <DesktopIcon icon={<Globe size={isMobile ? 42 : 34} color="#ff8a00" />} label="Web Browser" onDoubleClick={() => openApp(APP_BROWSER, 'Internet Explorer')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_BROWSER, 'Internet Explorer')))} />
+        <DesktopIcon icon={<Settings size={isMobile ? 42 : 34} color="#6366f1" />} label="Display" onDoubleClick={() => openApp(APP_DISPLAY, 'Display Properties')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_DISPLAY, 'Display Properties')))} />
+        <DesktopIcon icon={<CheckCircle size={isMobile ? 42 : 34} color="#46ac46" />} label="Tasks" onDoubleClick={() => openApp(APP_TODO, 'Todo List')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_TODO, 'Todo List')))} />
+        <DesktopIcon icon={<StickyNote size={isMobile ? 42 : 34} color="#fbbf24" />} label="Notes" onDoubleClick={() => openApp(APP_NOTES, 'Digital Notebook')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_NOTES, 'Digital Notebook')))} />
+        <DesktopIcon icon={<Bomb size={isMobile ? 42 : 34} color="#ef4444" />} label="Minesweeper" onDoubleClick={() => openApp(APP_MINESWEEPER, 'Minesweeper')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_MINESWEEPER, 'Minesweeper')))} />
+        <DesktopIcon icon={<Layout size={isMobile ? 38 : 34} color="#245edb" />} label="Solitaire" onDoubleClick={() => openApp(APP_SOLITAIRE, 'Solitaire')} onContextMenu={(e) => showContextMenu(e, iconMenu(null, () => openApp(APP_SOLITAIRE, 'Solitaire')))} />
+        <DesktopIcon
+          icon={findNodeById(fs.children, 'recycle-bin')?.children?.length > 0 ? <Trash size={isMobile ? 42 : 34} color="#0058e6" /> : <Trash2 size={isMobile ? 42 : 34} color="#0058e6" />}
+          label="Recycle Bin"
+          onDoubleClick={() => { setCurrentFolderId('recycle-bin'); openApp(APP_EXPLORER, 'Recycle Bin'); }}
+          innerRef={recycleBinRef}
+          onContextMenu={(e) => showContextMenu(e, [
+            { label: 'Open', action: () => { setCurrentFolderId('recycle-bin'); openApp(APP_EXPLORER, 'Recycle Bin'); }, bold: true },
+            { label: 'Empty Recycle Bin', action: () => { if (confirm('Are you sure you want to empty the Recycle Bin?')) setFs(emptyTrash(fs)); } },
+            { type: 'sep' },
+            { label: 'Properties', action: () => { } }
+          ])}
+        />
+
+        {findNodeById(fs.children, 'desktop')?.children?.map(node => (
+          <DesktopIcon
+            key={node.id}
+            label={node.name}
+            onDragEnd={(e, info) => handleDragIconEnd(e, info, node.id, node.name)}
+            icon={node.type === 'folder' ? <Folder size={isMobile ? 42 : 34} color="#ffcc00" /> : <FileText size={isMobile ? 42 : 34} color="#94a3b8" />}
+            onDoubleClick={() => {
+              if (node.type === 'folder') {
+                setCurrentFolderId(node.id);
+                openApp(APP_EXPLORER, node.name);
+              } else if (node.type === 'file') {
+                openApp(APP_NOTEPAD, 'Notepad', { file: node });
+              }
+            }}
+            onContextMenu={(e) => {
+              const options = [
+                {
+                  label: 'Open', action: () => {
+                    if (node.type === 'folder') {
+                      setCurrentFolderId(node.id);
+                      openApp(APP_EXPLORER, node.name);
+                    } else {
+                      openApp(APP_NOTEPAD, 'Notepad', { file: node });
+                    }
+                  }, bold: true
+                },
+                {
+                  label: 'Delete', action: () => {
+                    if (confirm(`Are you sure you want to move ${node.name} to the Recycle Bin?`)) {
+                      setFs(moveToTrash(fs, node.id));
+                    }
+                  }
+                },
+                {
+                  label: 'Rename', action: () => {
+                    const name = prompt('Rename to:', node.name);
+                    if (name) {
+                      setFs({ ...fs, children: updateNodeInTree(fs.children, node.id, (n) => ({ ...n, name })) });
+                    }
+                  }
+                },
+                { type: 'sep' },
+                { label: 'Properties', action: () => alert(`Name: ${node.name}\nType: ${node.type}`) }
+              ];
+              showContextMenu(e, options);
+            }}
+          />
+        ))}
 
         <AnimatePresence>
           {windows.map(win => (isMobile ? activeWindow === win.id : !win.minimized) && (
             <Window key={win.id} window={win} isMobile={isMobile} isActive={activeWindow === win.id} onClose={() => closeWindow(win.id)} onMinimize={() => toggleMinimize(win.id)} onFocus={() => focusWindow(win.id)}>
               {win.id === APP_RESUME && <ResumeViewer isMobile={isMobile} />}
               {win.id === APP_TASK_MANAGER && <TaskManager stats={stats} history={history} isMobile={isMobile} />}
-              {win.id === APP_EXPLORER && <FileExplorer triggerBsod={triggerBsod} isMobile={isMobile} />}
-              {win.id === APP_BROWSER && <WebBrowser isMobile={isMobile} />}
+              {win.id === APP_EXPLORER && <FileExplorer triggerBsod={triggerBsod} isMobile={isMobile} fs={fs} setFs={setFs} currentFolderId={currentFolderId} setCurrentFolderId={setCurrentFolderId} openApp={openApp} showContextMenu={showContextMenu} />}
+              {win.id === APP_BROWSER && <Browser isMobile={isMobile} />}
               {win.id === APP_PAINT && <PaintApp isMobile={isMobile} />}
               {win.id === APP_CALC && <Calculator isMobile={isMobile} />}
               {win.id === APP_DISPLAY && <DisplayProps setWallpaper={setWallpaper} wallpaper={wallpaper} isMobile={isMobile} />}
-              {win.id === APP_NOTEPAD && <Notepad isMobile={isMobile} />}
+              {win.id === APP_NOTEPAD && <NotepadApp initialFile={openFile} onSave={(file) => {
+                const updatedFs = { ...fs, children: updateNodeInTree(fs.children, file.id || 'documents', node => ({ ...node, ...file })) };
+                setFs(updatedFs);
+                saveFileSystem(updatedFs);
+                setOpenFile(file);
+              }} isMobile={isMobile} />}
+              {win.id === APP_TODO && <TodoApp isMobile={isMobile} />}
+              {win.id === APP_NOTES && <NotesApp isMobile={isMobile} />}
+              {win.id === APP_MINESWEEPER && <Minesweeper isMobile={isMobile} />}
+              {win.id === APP_SOLITAIRE && <Solitaire isMobile={isMobile} />}
             </Window>
           ))}
         </AnimatePresence>
@@ -238,6 +397,10 @@ const App = () => {
                 <MenuItem icon={<CalcIcon size={18} color="#245edb" />} label="Calculator" onClick={() => openApp(APP_CALC, 'Calculator')} />
                 <MenuItem icon={<Palette size={18} color="#245edb" />} label="Paint" onClick={() => openApp(APP_PAINT, 'Paint')} />
                 <MenuItem icon={<Monitor size={18} color="#245edb" />} label="Task Manager" onClick={() => openApp(APP_TASK_MANAGER, 'Task Manager')} />
+                <MenuItem icon={<CheckCircle size={18} color="#245edb" />} label="Todo List" onClick={() => openApp(APP_TODO, 'Todo List')} />
+                <MenuItem icon={<StickyNote size={18} color="#245edb" />} label="Notes" onClick={() => openApp(APP_NOTES, 'Digital Notebook')} />
+                <MenuItem icon={<Bomb size={18} color="#245edb" />} label="Minesweeper" onClick={() => openApp(APP_MINESWEEPER, 'Minesweeper')} />
+                <MenuItem icon={<Layout size={18} color="#245edb" />} label="Solitaire" onClick={() => openApp(APP_SOLITAIRE, 'Solitaire')} />
               </div>
               {!isMobile && (
                 <div className="menu-right">
@@ -250,17 +413,41 @@ const App = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {contextMenu.visible && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {contextMenu.options.map((opt, i) => (
+              opt.type === 'sep' ? <div key={i} className="context-menu-sep" /> :
+                <div key={i} className="context-menu-item" onClick={opt.action}>{opt.label}</div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 // --- Sub-Components ---
 
-const DesktopIcon = ({ icon, label, onDoubleClick }) => (
-  <div className="desktop-icon" onDoubleClick={onDoubleClick}>
+const DesktopIcon = ({ icon, label, onDoubleClick, onContextMenu, innerRef, isDraggable = true, onDragEnd }) => (
+  <motion.div
+    ref={innerRef}
+    drag={isDraggable}
+    dragMomentum={false}
+    onDragEnd={onDragEnd}
+    className="desktop-icon"
+    onDoubleClick={onDoubleClick}
+    onContextMenu={onContextMenu}
+  >
     <div className="icon-wrapper">{icon}</div>
     <span>{label}</span>
-  </div>
+  </motion.div>
 );
 
 const Window = ({ window, children, onClose, onMinimize, isActive, onFocus, isMobile }) => (
@@ -269,8 +456,24 @@ const Window = ({ window, children, onClose, onMinimize, isActive, onFocus, isMo
       zIndex: window.zIndex,
       left: isMobile ? 0 : window.position.x,
       top: isMobile ? 0 : window.position.y,
-      width: isMobile ? '100%' : (window.id === APP_CALC ? 320 : (window.id === APP_PAINT ? 800 : (window.id === APP_DISPLAY ? 480 : 960))),
-      height: isMobile ? '100%' : (window.id === APP_CALC ? 400 : (window.id === APP_PAINT ? 620 : (window.id === APP_DISPLAY ? 520 : 680)))
+      width: isMobile ? '100%' : (
+        window.id === APP_CALC ? 320 :
+          window.id === APP_PAINT ? 800 :
+            window.id === APP_DISPLAY ? 480 :
+              window.id === APP_MINESWEEPER ? 250 :
+                window.id === APP_TODO ? 400 :
+                  window.id === APP_NOTES ? 700 :
+                    960
+      ),
+      height: isMobile ? '100%' : (
+        window.id === APP_CALC ? 400 :
+          window.id === APP_PAINT ? 620 :
+            window.id === APP_DISPLAY ? 520 :
+              window.id === APP_MINESWEEPER ? 350 :
+                window.id === APP_TODO ? 500 :
+                  window.id === APP_NOTES ? 500 :
+                    680
+      )
     }}>
     <div className="window-bar"><span>{window.title}</span><div className="window-actions">{!isMobile && <div className="win-btn" onClick={onMinimize}><Minus size={14} color="white" /></div>}<div className="win-btn win-btn-close" onClick={onClose}><X size={14} color="white" /></div></div></div>
     <div className="win-inner">{children}</div>
@@ -316,33 +519,7 @@ const Calculator = () => {
   );
 };
 
-const PaintApp = ({ isMobile }) => {
-  const canvasRef = useRef(null);
-  const [color, setColor] = useState('#000');
-  const [drawing, setDrawing] = useState(false);
 
-  const draw = (e) => {
-    if (!drawing) return;
-    const ctx = canvasRef.current.getContext('2d');
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-    ctx.fillStyle = color;
-    ctx.fillRect(clientX - rect.left - 2, clientY - rect.top - 2, 5, 5);
-  };
-
-  return (
-    <div className="paint-container">
-      <div className="paint-tools" style={{ width: isMobile ? '40px' : '50px' }}>
-        {['#000', '#f12', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#888', '#fff'].map(c => <div key={c} style={{ width: '25px', height: '25px', background: c, border: color === c ? '2px solid white' : '1px solid #000', cursor: 'pointer' }} onClick={() => setColor(c)} />)}
-        <div onClick={() => canvasRef.current.getContext('2d').clearRect(0, 0, 800, 600)} style={{ cursor: 'pointer', fontSize: '10px', marginTop: '15px' }}><Trash size={20} /></div>
-      </div>
-      <div className="paint-canvas-area">
-        <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight - 80} className="paint-canvas" onMouseDown={() => setDrawing(true)} onMouseUp={() => setDrawing(false)} onMouseMove={draw} onTouchStart={() => setDrawing(true)} onTouchEnd={() => setDrawing(false)} onTouchMove={draw} />
-      </div>
-    </div>
-  );
-};
 
 const TaskManager = ({ stats, history, isMobile }) => (
   <div className="tm-container">
@@ -371,52 +548,122 @@ const TaskManager = ({ stats, history, isMobile }) => (
   </div>
 );
 
-const FileExplorer = ({ triggerBsod, isMobile }) => (
-  <div className="explorer-layout">
-    {!isMobile && (
-      <div className="explorer-side">
-        <div className="side-card">
-          <div className="side-title">System Tasks</div>
-          <div className="side-link" onClick={() => window.open('/resume.pdf')}>View Resume</div>
-        </div>
-        <div className="side-card">
-          <div className="side-title">Other Places</div>
-          <div className="side-link">Desktop</div>
-        </div>
-      </div>
-    )}
-    <div className="explorer-main">
-      <div className="explorer-nav">Address: C:\WINDOWS\System32</div>
-      <div className="explorer-view" style={{ gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(60px, 1fr))' : 'repeat(auto-fill, minmax(80px, 1fr))' }}>
-        <div className="explorer-item"><Folder size={40} color="#ffcc00" /><span>Drivers</span></div>
-        <div className="explorer-item"><Settings size={40} color="#999" /><span>config</span></div>
-        <div className="explorer-item" onClick={triggerBsod}><AlertCircle size={40} color="#ef4444" /><span>System32</span></div>
-        <div className="explorer-item"><FileText size={40} color="#94a3b8" /><span>kernel.dll</span></div>
-        <div className="explorer-item"><Music size={40} color="#6366f1" /><span>startup</span></div>
-      </div>
-    </div>
-  </div>
-);
+const FileExplorer = ({ triggerBsod, isMobile, fs, setFs, currentFolderId, setCurrentFolderId, openApp, showContextMenu }) => {
+  const currentFolder = findNodeById(fs.children, currentFolderId) || fs.children[0];
 
-const WebBrowser = () => {
-  const [url, setUrl] = useState('https://www.kumarmohan.com');
-  const [frameUrl, setFrameUrl] = useState('https://www.kumarmohan.com');
+  const handleDoubleClick = (node) => {
+    if (node.type === 'folder' || node.type === 'drive') {
+      setCurrentFolderId(node.id);
+    } else if (node.type === 'file') {
+      if (node.name.endsWith('.txt') || node.id === 'readme') {
+        openApp(APP_NOTEPAD, 'Notepad', { file: node });
+      }
+    }
+  };
+
+  const createFolder = () => {
+    const name = prompt('Enter folder name:', 'New Folder');
+    if (name) {
+      const newNode = { id: 'folder-' + Date.now(), name, type: 'folder', children: [] };
+      setFs(addNodeToParent(fs, currentFolderId, newNode));
+    }
+  };
+
+  const createFile = () => {
+    const name = prompt('Enter file name:', 'New Text Document.txt');
+    if (name) {
+      const newNode = { id: 'file-' + Date.now(), name, type: 'file', content: '' };
+      setFs(addNodeToParent(fs, currentFolderId, newNode));
+    }
+  };
+
+  const explorerOptions = [
+    { label: 'View', action: () => { } },
+    { label: 'Refresh', action: () => setFs(getFileSystem()) },
+    { type: 'sep' },
+    currentFolderId === 'recycle-bin' ?
+      { label: 'Empty Recycle Bin', action: () => { if (confirm('Empty all items?')) setFs(emptyTrash(fs)); } } :
+      { label: 'New Folder', action: createFolder },
+    currentFolderId !== 'recycle-bin' && { label: 'New Text Document', action: createFile },
+    { type: 'sep' },
+    { label: 'Properties', action: () => { } }
+  ].filter(Boolean);
+
+  const getItemOptions = (node) => [
+    { label: 'Open', action: () => handleDoubleClick(node) },
+    { label: 'Explore', action: () => handleDoubleClick(node) },
+    { type: 'sep' },
+    {
+      label: 'Delete', action: () => {
+        if (confirm(`Are you sure you want to move ${node.name} to the Recycle Bin?`)) {
+          setFs(moveToTrash(fs, node.id));
+        }
+      }
+    },
+    {
+      label: 'Rename', action: () => {
+        const name = prompt('Rename to:', node.name);
+        if (name) {
+          setFs({ ...fs, children: updateNodeInTree(fs.children, node.id, (n) => ({ ...n, name })) });
+        }
+      }
+    },
+    { type: 'sep' },
+    { label: 'Properties', action: () => alert(`Name: ${node.name}\nType: ${node.type}`) }
+  ];
+
   return (
-    <div className="browser-shell">
-      <div className="browser-toolbar">
-        <div className="address-bar">
-          <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && setFrameUrl(url)} />
-          <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={() => setFrameUrl(url + '?t=' + Date.now())} />
+    <div className="explorer-layout">
+      {!isMobile && (
+        <div className="explorer-side">
+          <div className="side-card">
+            <div className="side-title">File Tasks</div>
+            <div className="side-link" onClick={createFolder}><FolderPlus size={12} /> Create Folder</div>
+            <div className="side-link" onClick={createFile}><FilePlus size={12} /> Create Text File</div>
+          </div>
+          <div className="side-card">
+            <div className="side-title">Other Places</div>
+            <div className="side-link" onClick={() => setCurrentFolderId('c-drive')}>My Computer</div>
+            <div className="side-link" onClick={() => setCurrentFolderId('desktop')}>Desktop</div>
+          </div>
         </div>
-      </div>
-      <div className="browser-content">
-        <iframe src={frameUrl} title="web" sandbox="allow-same-origin allow-scripts allow-forms" />
+      )}
+      <div className="explorer-main">
+        <div className="explorer-nav">
+          <ArrowLeft size={14} style={{ cursor: 'pointer' }} onClick={() => setCurrentFolderId('c-drive')} title="Back to My Computer" />
+          <div style={{ marginLeft: '10px', fontSize: '11px', flex: 1, background: 'white', border: '1px solid #7f9db9', padding: '2px 5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Address: C:\{currentFolderId === 'c-drive' ? '' : currentFolder?.name}
+          </div>
+          <RefreshCw size={14} style={{ cursor: 'pointer', marginLeft: '10px' }} onClick={() => setFs(getFileSystem())} />
+        </div>
+        <div
+          className="explorer-view"
+          onContextMenu={(e) => showContextMenu(e, explorerOptions)}
+          style={{ gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(60px, 1fr))' : 'repeat(auto-fill, minmax(80px, 1fr))' }}
+        >
+          {currentFolder?.children?.map(node => (
+            <div
+              key={node.id}
+              className="explorer-item"
+              onDoubleClick={() => handleDoubleClick(node)}
+              onClick={() => isMobile && handleDoubleClick(node)}
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                showContextMenu(e, getItemOptions(node));
+              }}
+            >
+              {node.type === 'folder' && <Folder size={40} color="#ffcc00" />}
+              {node.type === 'drive' && <HardDrive size={40} color="#0058e6" />}
+              {node.type === 'file' && <FileText size={40} color="#94a3b8" />}
+              <span>{node.name}</span>
+            </div>
+          ))}
+          {currentFolderId === 'system32' && <div className="explorer-item" onClick={triggerBsod}><AlertCircle size={40} color="#ef4444" /><span>System32</span></div>}
+        </div>
       </div>
     </div>
   );
 };
-
-const Notepad = () => <textarea style={{ width: '100%', height: '100%', border: 'none', padding: '15px', fontFamily: 'Courier New', outline: 'none' }} defaultValue="System Initialization OK." />;
 
 const DisplayProps = ({ setWallpaper, wallpaper, isMobile }) => (
   <div style={{ padding: isMobile ? '10px' : '20px', background: '#ece9d8', height: '100%', width: '100%' }}>

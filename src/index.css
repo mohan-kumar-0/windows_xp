@@ -776,3 +776,34 @@ body {
     max-width: 100px;
   }
 }
+
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  background: #f0f0f0;
+  border: 1px solid #7f9db9;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+  padding: 2px;
+  z-index: 20000;
+  min-width: 160px;
+  font-family: 'Tahoma', sans-serif;
+}
+
+.context-menu-item {
+  padding: 4px 20px 4px 25px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #000;
+  white-space: nowrap;
+}
+
+.context-menu-item:hover {
+  background: #316ac5;
+  color: #fff;
+}
+
+.context-menu-sep {
+  height: 1px;
+  background: #aca899;
+  margin: 3px 2px;
+}
